@@ -7,20 +7,33 @@ app.set('view engine', 'ejs');
 app.use(express.static(__dirname + '/public'));
 var urlencodedParser = bodyParser.urlencoded({extended : false});
 
-var connection = mysql.createConnection({
+var db_credentials = {
     host: 'us-cdbr-iron-east-01.cleardb.net',
     user: 'b50b26470e7ecb',
     password: '74b4134b',
     database: 'heroku_5e74c9e184c66a0'
-});
+}
 
-connection.connect(function(err) {
-  if (err) {
-    console.error('error connecting: ' + err.stack);
-    return;
-  }
-  console.log('connected as id ' + connection.threadId);
-});
+var connection;
+
+function keepDBActive() {
+    connection = mysql.createConnection(db_credentials);
+    connection.connect(function(err) {
+        if(err) {
+            console.log('error occurred when connecting to db:', err);
+            setTimeout(keepDBActive, 2000);
+        }
+        console.log('db connected as id ' + connection.threadId);
+    })
+
+    connection.on('error', function(err) {
+        console.log('db connection lost:', err);
+        if(err.code == 'PROTOCOL_CONNECTION_LOST') handleDisconnect();
+        else throw err;
+    })
+}
+
+keepDBActive();
 
 app.get("/", function(req, res){
     var q = 'SELECT COUNT(*) as count FROM users';
@@ -41,5 +54,5 @@ app.post('/register', urlencodedParser, function(req, res) {
 });
 
 app.listen(process.env.PORT, function () {
- console.log('App listening on port ' + process.env.PORT);
+    console.log('App listening on port ' + process.env.PORT);
 });
